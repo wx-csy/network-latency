@@ -1,5 +1,6 @@
 use std::io::{Read, Write};
-use std::net::{SocketAddr, TcpListener, TcpStream, UdpSocket};
+use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream, UdpSocket};
+use std::thread::Thread;
 use std::time::Instant;
 
 use clap::Parser;
@@ -83,7 +84,7 @@ fn start_tcp_server(addr: SocketAddr, max_data_size: usize) {
     }
 
     for stream in listener.incoming() {
-        handle_client(stream.unwrap(), max_data_size);
+        std::thread::spawn(move || handle_client(stream.unwrap(), max_data_size));
     }
 }
 
@@ -97,7 +98,7 @@ fn start_udp_server(addr: SocketAddr, max_data_size: usize) {
 }
 
 fn start_tcp_client(addr: SocketAddr, data_size: usize, repeat: usize) {
-    let mut socket = TcpStream::connect(addr).unwrap();
+    let mut stream = TcpStream::connect(addr).unwrap();
 
     let mut data: Vec<u8> = vec![0; data_size];
     let mut recv_data: Vec<u8> = vec![0; data_size];
@@ -105,11 +106,12 @@ fn start_tcp_client(addr: SocketAddr, data_size: usize, repeat: usize) {
     for _ in 0..repeat {
         rand::thread_rng().fill_bytes(data.as_mut_slice());
         let start = Instant::now();
-        socket.write_all(data.as_slice()).unwrap();
-        socket.read_exact(recv_data.as_mut_slice()).unwrap();
+        stream.write_all(data.as_slice()).unwrap();
+        stream.read_exact(recv_data.as_mut_slice()).unwrap();
         assert_eq!(data, recv_data);
         eprintln!("{} us elapsed", start.elapsed().as_micros());
     }
+    stream.shutdown(Shutdown::Both).unwrap();
 }
 
 fn start_udp_client(
