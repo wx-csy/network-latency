@@ -14,6 +14,13 @@ pub enum Opts {
             about = "the local socket address to listen"
         )]
         socket_addr: SocketAddr,
+        #[clap(
+            short,
+            long,
+            default_value = "1048576",
+            about = "maximum size of data allowed to receive"
+        )]
+        max_data_size: usize,
     },
     #[clap(about = "start a network latency test udp server")]
     UdpServer {
@@ -22,14 +29,26 @@ pub enum Opts {
             about = "the local socket address to listen"
         )]
         socket_addr: SocketAddr,
+        #[clap(
+            short,
+            long,
+            default_value = "1048576",
+            about = "maximum size of data allowed to receive"
+        )]
+        max_data_size: usize,
     },
     #[clap(about = "start as a tcp worker")]
     TcpClient {
         #[clap(about = "the remote socket address to connect")]
         socket_addr: SocketAddr,
-        #[clap(default_value = "1024", about = "the data size to send")]
+        #[clap(short, long, default_value = "1024", about = "the data size to send")]
         data_size: usize,
-        #[clap(default_value = "100", about = "the number of repetitions")]
+        #[clap(
+            short,
+            long,
+            default_value = "100",
+            about = "the number of repetitions"
+        )]
         repeat: usize,
     },
     #[clap(about = "start as a udp worker")]
@@ -41,34 +60,39 @@ pub enum Opts {
             about = "the local socket address to connect"
         )]
         local_addr: SocketAddr,
-        #[clap(default_value = "1024", about = "the data size to send")]
+        #[clap(short, long, default_value = "1024", about = "the data size to send")]
         data_size: usize,
-        #[clap(default_value = "100", about = "the number of repetitions")]
+        #[clap(
+            short,
+            long,
+            default_value = "100",
+            about = "the number of repetitions"
+        )]
         repeat: usize,
     },
 }
 
-fn start_tcp_server(addr: SocketAddr) {
+fn start_tcp_server(addr: SocketAddr, max_data_size: usize) {
     let listener = TcpListener::bind(addr).unwrap();
 
-    fn handle_client(mut stream: TcpStream) {
-        let mut buf = vec![0u8; 512];
-        while let Ok(()) = stream.read_exact(buf.as_mut_slice()) {
-            stream.write_all(buf.as_slice()).unwrap();
+    fn handle_client(mut stream: TcpStream, max_data_size: usize) {
+        let mut buf = vec![0u8; max_data_size];
+        while let Ok(size) = stream.read(buf.as_mut_slice()) {
+            stream.write_all(&buf[..size]).unwrap();
         }
     }
 
     for stream in listener.incoming() {
-        handle_client(stream.unwrap());
+        handle_client(stream.unwrap(), max_data_size);
     }
 }
 
-fn start_udp_server(addr: SocketAddr) {
+fn start_udp_server(addr: SocketAddr, max_data_size: usize) {
     let socket = UdpSocket::bind(addr).unwrap();
 
-    let mut buf = vec![0u8; 4096];
-    while let Ok((_, peer_addr)) = socket.recv_from(buf.as_mut()) {
-        socket.send_to(buf.as_slice(), peer_addr).unwrap();
+    let mut buf = vec![0u8; max_data_size];
+    while let Ok((size, peer_addr)) = socket.recv_from(buf.as_mut()) {
+        socket.send_to(&buf[..size], peer_addr).unwrap();
     }
 }
 
@@ -112,8 +136,14 @@ fn start_udp_client(
 
 fn main() {
     match Opts::parse() {
-        Opts::TcpServer { socket_addr } => start_tcp_server(socket_addr),
-        Opts::UdpServer { socket_addr } => start_udp_server(socket_addr),
+        Opts::TcpServer {
+            socket_addr,
+            max_data_size,
+        } => start_tcp_server(socket_addr, max_data_size),
+        Opts::UdpServer {
+            socket_addr,
+            max_data_size,
+        } => start_udp_server(socket_addr, max_data_size),
         Opts::TcpClient {
             socket_addr,
             data_size,
