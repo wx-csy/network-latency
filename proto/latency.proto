@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package latency;
+
+// The message type.
+message Message { bytes payload = 1; }
+
+service Latency {
+  // Bidirectional RPC
+  rpc Bidirectional(stream Message) returns (stream Message);
+  // Unary RPC
+  rpc Unary(Message) returns (Message);
+}

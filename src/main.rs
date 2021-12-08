@@ -1,10 +1,11 @@
 use std::io::{Read, Write};
 use std::net::{Shutdown, SocketAddr, TcpListener, TcpStream, UdpSocket};
-use std::thread::Thread;
 use std::time::Instant;
 
 use clap::Parser;
 use rand::RngCore;
+
+mod grpc;
 
 #[derive(Parser, Debug)]
 pub enum Opts {
@@ -80,6 +81,7 @@ fn start_tcp_server(addr: SocketAddr, max_data_size: usize) {
         let mut buf = vec![0u8; max_data_size];
         while let Ok(size) = stream.read(buf.as_mut_slice()) {
             stream.write_all(&buf[..size]).unwrap();
+            stream.flush().unwrap();
         }
     }
 
@@ -107,6 +109,7 @@ fn start_tcp_client(addr: SocketAddr, data_size: usize, repeat: usize) {
         rand::thread_rng().fill_bytes(data.as_mut_slice());
         let start = Instant::now();
         stream.write_all(data.as_slice()).unwrap();
+        stream.flush().unwrap();
         stream.read_exact(recv_data.as_mut_slice()).unwrap();
         assert_eq!(data, recv_data);
         eprintln!("{} us elapsed", start.elapsed().as_micros());
